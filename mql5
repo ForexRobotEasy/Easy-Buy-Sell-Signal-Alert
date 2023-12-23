@@ -1,0 +1,104 @@
+mql5
+//+------------------------------------------------------------------+
+//|                      Easy Buy Sell Signal Alert                   |
+//|                     Developer: Forex Robot Easy Team              |
+//|                     Website: forexroboteasy.com                   |
+//+------------------------------------------------------------------+
+
+// Include necessary libraries and define constants
+#include <Trade\Trade.mqh>
+#include <Technical\Indicators\Trend.mqh>
+
+#define SYMBOL 'EURUSD'     // Trading symbol
+#define LOT_SIZE 0.01       // Lot size for trades
+#define STOP_LOSS 50        // Stop loss level in pips
+#define TAKE_PROFIT 100     // Take profit level in pips
+
+CTrade trade;               // Trade object for executing trades
+CTrend trend;               // Trend object for generating signals
+
+// Function to analyze market data and generate trading signals
+void AnalyzeMarketData()
+{
+    // Perform technical analysis using trend indicators
+    double trendValue = trend.iTrend(SYMBOL, PERIOD_CURRENT, 14, PRICE_CLOSE, MODE_SMA, 0);
+    
+    // Generate buy signal if trend is bullish
+    if (trendValue > 0)
+    {
+        trade.Buy(LOT_SIZE, SYMBOL, 0, 0, STOP_LOSS, TAKE_PROFIT, 'Buy Signal');
+        Print('Buy signal generated at price: ', trade.Ask());
+    }
+    
+    // Generate sell signal if trend is bearish
+    else if (trendValue < 0)
+    {
+        trade.Sell(LOT_SIZE, SYMBOL, 0, 0, STOP_LOSS, TAKE_PROFIT, 'Sell Signal');
+        Print('Sell signal generated at price: ', trade.Bid());
+    }
+}
+
+// Function to execute trades based on generated signals
+void ExecuteTrades()
+{
+    // Check for pending buy trades
+    if (trade.PositionsTotal() > 0 && trade.PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
+    {
+        // Close buy trade if take profit or stop loss level is reached
+        if (trade.PositionGetDouble(POSITION_TP) != 0 && trade.PositionGetDouble(POSITION_TP) <= trade.Bid() ||
+            trade.PositionGetDouble(POSITION_SL) != 0 && trade.PositionGetDouble(POSITION_SL) >= trade.Bid())
+        {
+            trade.PositionClose(trade.PositionGetTicket(), trade.PositionGetDouble(POSITION_VOLUME));
+            Print('Buy trade closed at price: ', trade.Bid());
+        }
+    }
+    
+    // Check for pending sell trades
+    else if (trade.PositionsTotal() > 0 && trade.PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL)
+    {
+        // Close sell trade if take profit or stop loss level is reached
+        if (trade.PositionGetDouble(POSITION_TP) != 0 && trade.PositionGetDouble(POSITION_TP) >= trade.Ask() ||
+            trade.PositionGetDouble(POSITION_SL) != 0 && trade.PositionGetDouble(POSITION_SL) <= trade.Ask())
+        {
+            trade.PositionClose(trade.PositionGetTicket(), trade.PositionGetDouble(POSITION_VOLUME));
+            Print('Sell trade closed at price: ', trade.Ask());
+        }
+    }
+}
+
+// Function to handle real-time alerts and notifications
+void HandleAlerts()
+{
+    // Check for newly generated signals
+    if (trend.RecentlyChanged())
+    {
+        // Send email notification to user
+        SendMail('New Trading Signal', 'A new trading signal has been generated.');
+        
+        // Display alert on the chart
+        Alert('New Trading Signal');
+    }
+}
+
+// Main program loop
+void OnTick()
+{
+    AnalyzeMarketData();
+    ExecuteTrades();
+    HandleAlerts();
+}
+
+// Program initialization function
+void OnInit()
+{
+    // Initialize trade and trend objects
+    trade.SetDeviationInPoints(10);
+    trend.SetSymbol(SYMBOL);
+}
+
+// Program deinitialization function
+void OnDeinit(const int reason)
+{
+    // Cleanup and close any open trades
+    trade.PositionCloseAll();
+}
